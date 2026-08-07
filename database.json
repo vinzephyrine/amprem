@@ -1,3 +1,32 @@
 {
-  "sessions": {}
+  "sessions": {
+    "aditggwp0123@gmail.com": {
+      "email": "aditggwp0123@gmail.com",
+      "status": "pending",
+      "sentAt": "2026-08-07T12:42:09.500Z",
+      "verifiedAt": null,
+      "link": null
+    },
+    "pighack44@gmail.com": {
+      "email": "pighack44@gmail.com",
+      "status": "pending",
+      "sentAt": "2026-08-07T12:42:25.043Z",
+      "verifiedAt": null,
+      "link": null
+    },
+    "djdndkdodkdn@gmail.com": {
+      "email": "djdndkdodkdn@gmail.com",
+      "status": "pending",
+      "sentAt": "2026-08-07T12:42:58.106Z",
+      "verifiedAt": null,
+      "link": null
+    },
+    "teddydermawan218@gmail.com": {
+      "email": "teddydermawan218@gmail.com",
+      "status": "pending",
+      "sentAt": "2026-08-07T12:44:57.300Z",
+      "verifiedAt": null,
+      "link": null
+    }
+  }
 }
