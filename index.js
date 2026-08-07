@@ -1,0 +1,696 @@
+const fs = require("fs");
+const path = require("path");
+const TelegramBotApi = require("node-telegram-bot-api");
+const TelegramBot = TelegramBotApi.default || TelegramBotApi;
+
+const global = require("./config.js");
+const axios = require("axios");
+const chalk = require("chalk");
+const amprem = require("amprem");
+
+const bot = new TelegramBot(global.botToken, { polling: true });
+
+const CHANNELS = ["@aboutvin7x", "@vinzxcommnty"];
+const IMAGE_URL = "https://g.top4top.io/p_3871xq4od1.jpg";
+
+const DB_PATH = path.join(__dirname, "database.json");
+const USERS_PATH = path.join(__dirname, "users.json");
+
+let db = {};
+let usersList = [];
+const userState = {};
+
+const mainOwnerIds = Array.isArray(global.ownerId)
+  ? global.ownerId
+  : global.ownerId
+  ? [global.ownerId]
+  : [];
+
+function isMainOwner(senderId) {
+  return mainOwnerIds.includes(senderId);
+}
+
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+    } else {
+      db = { sessions: {} };
+      saveDatabase();
+    }
+  } catch (error) {
+    console.error("Error loading database:", error);
+    db = { sessions: {} };
+  }
+}
+
+function saveDatabase() {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+  } catch (error) {
+    console.error("Error saving database:", error);
+  }
+}
+
+function loadUsersDatabase() {
+  try {
+    if (fs.existsSync(USERS_PATH)) {
+      usersList = JSON.parse(fs.readFileSync(USERS_PATH, "utf8"));
+    } else {
+      usersList = [];
+      saveUsersDatabase();
+    }
+  } catch (error) {
+    console.error("Error loading users database:", error);
+    usersList = [];
+  }
+}
+
+function saveUsersDatabase() {
+  try {
+    fs.writeFileSync(USERS_PATH, JSON.stringify(usersList, null, 2));
+  } catch (error) {
+    console.error("Error saving users database:", error);
+  }
+}
+
+function registerUser(userId) {
+  if (!usersList.includes(userId)) {
+    usersList.push(userId);
+    saveUsersDatabase();
+  }
+}
+
+loadDatabase();
+loadUsersDatabase();
+
+async function isChannelMember(userId) {
+  for (const channel of CHANNELS) {
+    try {
+      const member = await bot.getChatMember(channel, userId);
+      const isOk = ["member", "administrator", "creator"].includes(member.status);
+      if (!isOk) return false;
+    } catch (error) {
+      console.log(`Channel check error (${channel}):`, error.message);
+      return false;
+    }
+  }
+  return true;
+}
+
+function startBot() {
+  const steps = 20;
+  let progress = 0;
+
+  const interval = setInterval(() => {
+    const percent = Math.floor((progress / steps) * 100);
+    const filled = "▓".repeat(progress);
+    const empty = "░".repeat(steps - progress);
+
+    let color;
+    if (percent < 30) color = chalk.greenBright;
+    else if (percent < 60) color = chalk.yellowBright;
+    else if (percent < 90) color = chalk.magentaBright;
+    else color = chalk.redBright;
+
+    console.clear();
+    console.log(chalk.bold("🔄 Memulai Bot Telegram...\n"));
+    console.log(color(`${filled}${empty} ${percent}%`));
+
+    progress++;
+
+    if (progress > steps) {
+      clearInterval(interval);
+      console.clear();
+      console.log(
+        chalk.green(`
+⣿⣿⣿⣿⣿⣷⣿⣿⣿⡅⡹⢿⠆⠙⠋⠉⠻⠿⣿⣿⣿⣿⣿⣿⣮⠻⣦⡙⢷⡑⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣌⠡⠌⠂⣙⠻⣛⠻⠷⠐⠈⠛⢱⣮⣷⣽⣿
+⣿⣿⣿⣿⡇⢿⢹⣿⣶⠐⠁⠀⣀⣠⣤⠄⠀⠀⠈⠙⠻⣿⣿⣿⣦⣵⣌⠻⣷⢝⠦⠚⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢟⣻⣿⣊⡃⠀⣙⠿⣿⣿⣿⣎⢮⡀⢮⣽⣿⣿
+⢿⣿⣿⣿⣧⡸⡎⡛⡩⠖⠀⣴⣿⣿⣿⠀⠀⠀⠀⠸⠇⠀⠙⢿⣿⣿⣿⣷⣌⢷⣑⢷⣄⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣫⠶⠛⠉⠀⠁⠀⠈⠈⠀⠠⠜⠻⣿⣆⢿⣼⣿⣿⣿
+⢐⣿⣿⣿⣿⣧⢧⣧⢻⣦⢀⣹⣿⣿⣿⣇⠀⠄⠀⠀⠀⡀⠀⠈⢻⣿⣿⣿⣿⣷⣝⢦⡹⠷⡙⢿⣿⣿⣿⣿⣿⣿⣿⣿⠈⠁⠀⠀⠀⠁⠀⠀⠀⠱⣶⣄⡀⠀⠈⠛⠜⣿⣿⣿⣿
+⠀⠊⢫⣿⣏⣿⡌⣼⣄⢫⡌⣿⣿⣿⣿⣿⣦⡈⠲⣄⣤⣤⡡⢀⣠⣿⣿⣿⣿⣿⣿⣷⣼⣍⢬⣦⡙⣿⣿⣿⣿⣿⣯⢁⡄⠀⡀⡀⠀⠄⢈⣠⢪⠀⣿⣿⣿⣦⠀⢉⢂⠹⡿⣿⣿
+⠀⠀⠄⢹⢃⢻⣟⠙⣿⣦⠱⢻⣿⣿⣿⣿⣿⣿⣷⣬⣍⣭⣥⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⡙⢿⣼⡿⣿⣿⣿⣿⣿⣷⣄⠘⣱⢦⣤⡴⡿⢈⣼⣿⣿⣿⣇⣴⣶⣮⣅⢻⣿⡏
+⠀⠀⠈⠹⣇⢡⢿⡆⠻⣿⣷⠀⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣍⡻⣿⣟⣻⣿⣿⣿⣿⣷⣦⣥⣬⣤⣴⣾⣿⣿⣿⣿⣷⣿⣿⣿⣿⣷⡜⠃
+⠀⠀⠀⢀⣘⠈⢂⠃⣧⡹⣿⣷⡄⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣮⣅⡙⢿⣟⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠋⡕⠂
+⠀⠀⠀⠀⠀⠀⠛⢷⣜⢷⡌⠻⣿⣿⣦⣝⣻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⣹⣷⣦⣹⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠉⠃⠀
+
+┌──────────────────────────────────────────────────┐
+│ DEVELOPER   : t.me/yat1mlau                      │
+│ INFORMATION : @aboutvin7x                        │
+│ VERSION     : 1.0 (AM Premium Activator)         │
+└──────────────────────────────────────────────────┘
+            ✨ Bot Running Successfully ✨
+        `)
+      );
+    }
+  }, 150);
+}
+
+async function deleteMessage(chatId, messageId) {
+  try {
+    await bot.deleteMessage(chatId, messageId);
+  } catch (e) {
+  }
+}
+
+async function sendRichMessage(chatId, htmlContent, replyMarkup = null) {
+  try {
+    const payload = {
+      chat_id: chatId,
+      rich_message: {
+        html: htmlContent
+      }
+    };
+    if (replyMarkup) payload.reply_markup = replyMarkup;
+
+    await axios.post(`https://api.telegram.org/bot${global.botToken}/sendRichMessage`, payload);
+  } catch (e) {
+    console.error("Gagal sendRichMessage:", e.response?.data || e.message);
+    await bot.sendMessage(chatId, htmlContent, { parse_mode: "HTML", reply_markup: replyMarkup });
+  }
+}
+
+function getMainMenuText(msgFrom) {
+  const username = msgFrom.username ? `@${msgFrom.username}` : "-";
+  const nickname = [msgFrom.first_name, msgFrom.last_name].filter(Boolean).join(" ") || "User";
+  const id = String(msgFrom.id);
+  const status = isMainOwner(msgFrom.id) ? "Owner" : "User";
+
+  return `<tg-collage>
+  <img src="${IMAGE_URL}"/>
+</tg-collage>
+
+<h2>✨ Alight Motion Premium Activator ✨</h2>
+<p>Selamat datang di Bot Aktivasi Alight Motion Premium! Bot ini siap membantu kamu mengaktifkan fitur premium akun Alight Motion secara cepat, otomatis, praktis, dan gratis.</p>
+
+<hr/>
+<h3>🤖 BOT INFORMATION</h3>
+<table bordered striped>
+  <tr><th>Information</th><th>Value</th></tr>
+  <tr><td>Author</td><td>t.me/yat1mlau</td></tr>
+  <tr><td>Version</td><td>1.0</td></tr>
+  <tr><td>Library</td><td>node-telegram-bot-api</td></tr>
+  <tr><td>Language</td><td>JavaScript</td></tr>
+  <tr><td>Node</td><td>${process.version}</td></tr>
+</table>
+
+<h3>👤 USER INFORMATION</h3>
+<table bordered striped>
+  <tr><th>Information</th><th>Detail</th></tr>
+  <tr><td>Nickname</td><td>${nickname}</td></tr>
+  <tr><td>Username</td><td>${username}</td></tr>
+  <tr><td>ID</td><td>${id}</td></tr>
+  <tr><td>Status</td><td>${status}</td></tr>
+</table>
+
+<hr/>
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+}
+
+function getMainMenuButtons() {
+  return {
+    inline_keyboard: [
+      [
+        { text: "「 ➕」Create AM", callback_data: "am_create", style: "primary" },
+        { text: "「 📊 」AM Menu", callback_data: "am_menu", style: "primary" }
+      ],
+      [
+        { text: "「 📢 」Channel", url: "https://t.me/aboutvin7x", style: "danger" }
+      ]
+    ]
+  };
+}
+
+function getAllFiles(dirPath, arrayOfFiles = [], ignoreList = []) {
+  const files = fs.readdirSync(dirPath);
+
+  files.forEach((file) => {
+    const fullPath = path.join(dirPath, file);
+    const relativePath = path.relative(__dirname, fullPath).replace(/\\/g, "/");
+
+    if (ignoreList.some((ignore) => relativePath.startsWith(ignore) || file === ignore)) {
+      return;
+    }
+
+    if (fs.statSync(fullPath).isDirectory()) {
+      arrayOfFiles = getAllFiles(fullPath, arrayOfFiles, ignoreList);
+    } else {
+      arrayOfFiles.push({
+        fullPath: fullPath,
+        relativePath: relativePath
+      });
+    }
+  });
+
+  return arrayOfFiles;
+}
+
+bot.onText(/\/start/, async (msg) => {
+  const chatId = msg.chat.id;
+  const senderId = msg.from.id;
+
+  registerUser(senderId);
+
+  const isMember = await isChannelMember(senderId);
+
+  if (!isMember) {
+    const text = `<h2>⊰─「 Akses Dibatasi 」─⊱</h2>
+<p>Wajib Follow kedua Channel di bawah ini untuk menggunakan bot!</p>
+
+<hr/>
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+    return sendRichMessage(chatId, text, {
+      inline_keyboard: [
+        [
+          { text: "📢 Join Channel 1", url: "https://t.me/aboutvin7x", style: "primary" },
+          { text: "📢 Join Channel 2", url: "https://t.me/vinzxcommnty", style: "primary" }
+        ],
+        [{ text: "✅ Sudah Follow", callback_data: "check_follow", style: "success" }]
+      ]
+    });
+  }
+
+  const htmlText = getMainMenuText(msg.from);
+  const buttons = getMainMenuButtons();
+
+  await sendRichMessage(chatId, htmlText, buttons);
+});
+
+bot.onText(/\/(bc|broadcast)(?:\s+([\s\S]+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const senderId = msg.from.id;
+  const broadcastText = match[2];
+
+  if (!isMainOwner(senderId)) {
+    return sendRichMessage(chatId, "<h3>❌ Akses Ditolak</h3><p>Perintah ini hanya dapat digunakan oleh Owner!</p>");
+  }
+
+  if (!broadcastText) {
+    const usageText = `<h3>📢 Format Broadcast Salah</h3>
+<p>Gunakan format perintah berikut:</p>
+<pre>/bc &lt;pesan broadcast&gt;</pre>
+<p>Contoh: <code>/bc Hallo semua, ada update bot terbaru!</code></p>`;
+    return sendRichMessage(chatId, usageText);
+  }
+
+  if (usersList.length === 0) {
+    return sendRichMessage(chatId, "<h3>📭 Database User Kosong</h3><p>Belum ada user yang terdaftar di database.</p>");
+  }
+
+  const statusMsg = await bot.sendMessage(chatId, "⏳ *Mengirim broadcast ke semua user...*", { parse_mode: "Markdown" });
+
+  let successCount = 0;
+  let failedCount = 0;
+
+  const formattedBcText = `<h2>📢 BROADCAST ANNOUNCEMENT</h2>
+
+<p>${broadcastText.replace(/\n/g, "<br/>")}</p>
+
+<hr/>
+<footer>© Message from Owner - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+  for (const targetId of usersList) {
+    try {
+      await sendRichMessage(targetId, formattedBcText);
+      successCount++;
+    } catch (e) {
+      failedCount++;
+    }
+  }
+
+  await deleteMessage(chatId, statusMsg.message_id);
+
+  const reportText = `<h2>✅ Broadcast Selesai!</h2>
+
+<table bordered striped>
+  <tr><th>Status</th><th>Jumlah</th></tr>
+  <tr><td>Total User</td><td>${usersList.length}</td></tr>
+  <tr><td>Berhasil</td><td>${successCount}</td></tr>
+  <tr><td>Gagal</td><td>${failedCount}</td></tr>
+</table>
+
+<hr/>
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+  await sendRichMessage(chatId, reportText);
+});
+
+bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const messageId = msg.message_id;
+  const senderId = msg.from.id;
+  const inputData = match[1];
+
+  if (!isMainOwner(senderId)) {
+    return sendRichMessage(chatId, "<h3>❌ Akses Ditolak</h3><p>Perintah ini hanya dapat digunakan oleh Owner!</p>");
+  }
+
+  if (!inputData || !inputData.includes("|")) {
+    const usageText = `<h3>📌 Format Backup Salah</h3>
+<p>Gunakan format perintah berikut:</p>
+<pre>/backup token_github|username_github|nama_repo</pre>
+<p>Contoh: <code>/backup ghp_xxxxxx|vinzephyrine|amprem-bot</code></p>`;
+    return sendRichMessage(chatId, usageText);
+  }
+
+  const parts = inputData.split("|");
+  if (parts.length < 3) {
+    const usageText = `<h3>📌 Format Backup Tidak Lengkap</h3>
+<p>Harap masukkan 3 parameter yang dipisahkan garis lurus (<code>|</code>):</p>
+<pre>/backup token_github|username_github|nama_repo</pre>`;
+    return sendRichMessage(chatId, usageText);
+  }
+
+  const token = parts[0].trim();
+  const owner = parts[1].trim();
+  const repo = parts[2].trim();
+
+  await deleteMessage(chatId, messageId);
+
+  const statusMsg = await bot.sendMessage(chatId, "⏳ *Memproses backup file utama ke GitHub...*", { parse_mode: "Markdown" });
+
+  try {
+    try {
+      await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: { Authorization: `token ${token}` }
+      });
+    } catch (e) {
+      await axios.post(
+        "https://api.github.com/user/repos",
+        { name: repo, private: false, auto_init: false },
+        {
+          headers: {
+            Authorization: `token ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
+
+    const allowedFiles = [
+      "config.js",
+      "index.js",
+      "package.json",
+      "database.json",
+      "users.json"
+    ];
+
+    const allFiles = getAllFiles(__dirname, [], ["node_modules", ".git", ".npm", ".npm-cache"]);
+    const filesToBackup = allFiles.filter((fileItem) =>
+      allowedFiles.includes(fileItem.relativePath)
+    );
+
+    let uploadedCount = 0;
+    let failedCount = 0;
+
+    for (const fileItem of filesToBackup) {
+      try {
+        const fileData = fs.readFileSync(fileItem.fullPath);
+        const base64Content = fileData.toString("base64");
+        const filePath = fileItem.relativePath;
+        const encodedPath = filePath.split("/").map(v => encodeURIComponent(v)).join("/");
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+
+        let sha = null;
+        try {
+          const check = await axios.get(url, {
+            headers: { Authorization: `token ${token}` }
+          });
+          sha = check.data.sha;
+        } catch (error) {
+        }
+
+        await axios.put(
+          url,
+          {
+            message: sha ? `Update ${filePath}` : `Add ${filePath}`,
+            content: base64Content,
+            sha: sha || undefined
+          },
+          {
+            headers: {
+              Authorization: `token ${token}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+
+        uploadedCount++;
+      } catch (err) {
+        failedCount++;
+      }
+    }
+
+    await deleteMessage(chatId, statusMsg.message_id);
+
+    const resultText = `<h2>✅ Backup ke GitHub Berhasil!</h2>
+
+<table bordered striped>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Repository</td><td><code>${owner}/${repo}</code></td></tr>
+  <tr><td>File Ter-backup</td><td>${uploadedCount} dari ${allowedFiles.length} File Utama</td></tr>
+  <tr><td>Gagal</td><td>${failedCount} File</td></tr>
+  <tr><td>Link Repo</td><td><a href="https://github.com/${owner}/${repo}">Klik Di Sini</a></td></tr>
+</table>
+
+<hr/>
+<footer>© Auto Backup System - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+    await sendRichMessage(chatId, resultText);
+  } catch (error) {
+    console.error("Backup Error:", error.response?.data || error.message);
+    await deleteMessage(chatId, statusMsg.message_id);
+    await sendRichMessage(chatId, `<h3>❌ Backup Gagal!</h3><p>${error.response?.data?.message || error.message}</p>`);
+  }
+});
+
+bot.on("callback_query", async (query) => {
+  const chatId = query.message.chat.id;
+  const messageId = query.message.message_id;
+  const senderId = query.from.id;
+  const action = query.data;
+
+  try {
+    if (action === "check_follow") {
+      const isMember = await isChannelMember(senderId);
+      if (!isMember) {
+        return bot.answerCallbackQuery(query.id, { text: "❌ Kamu belum follow kedua channel!", show_alert: true });
+      }
+
+      await bot.answerCallbackQuery(query.id, { text: "✅ Selamat datang!" });
+      await deleteMessage(chatId, messageId);
+
+      const htmlText = getMainMenuText(query.from);
+      const buttons = getMainMenuButtons();
+
+      return sendRichMessage(chatId, htmlText, buttons);
+    }
+
+    if (action === "am_create") {
+      userState[senderId] = { step: "wait_email" };
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const text = `<h3>📧 Masukkan Email Alight Motion</h3>
+<p>Kirim email yang mau di-premiumkan di bawah ini.</p>
+
+<pre>Contoh: email@gmail.com</pre>`;
+
+      return sendRichMessage(chatId, text);
+    }
+
+    if (action === "am_menu") {
+      if (!isMainOwner(senderId)) {
+        return bot.answerCallbackQuery(query.id, { text: "❌ Hanya Owner!", show_alert: true });
+      }
+
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const sessions = Object.values(db.sessions);
+      if (sessions.length === 0) {
+        const text = `<h3>📭 Belum Ada Session</h3>
+<p>Belum ada session Alight Motion yang terdaftar.</p>`;
+
+        return sendRichMessage(chatId, text, {
+          inline_keyboard: [[{ text: "↺ Kembali", callback_data: "back_menu", style: "danger" }]]
+        });
+      }
+
+      let rowsHtml = "";
+      sessions.forEach((s, i) => {
+        rowsHtml += `<tr><td>${i + 1}</td><td>${s.email}</td><td>${s.verifiedAt ? "Verified" : "Pending"}</td></tr>`;
+      });
+
+      const text = `<h2>📋 DAFTAR SESSION ALIGHT</h2>
+
+<table bordered striped>
+  <tr><th>No</th><th>Email</th><th>Status</th></tr>
+  ${rowsHtml}
+</table>
+
+<p>Total Session: ${sessions.length}</p>`;
+
+      return sendRichMessage(chatId, text, {
+        inline_keyboard: [[{ text: "↺ Kembali", callback_data: "back_menu", style: "danger" }]]
+      });
+    }
+
+    if (action === "back_menu") {
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const htmlText = getMainMenuText(query.from);
+      const buttons = getMainMenuButtons();
+
+      return sendRichMessage(chatId, htmlText, buttons);
+    }
+  } catch (e) {
+    console.error("Callback error:", e);
+    bot.answerCallbackQuery(query.id, { text: "❌ Error!", show_alert: true });
+  }
+});
+
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const senderId = msg.from.id;
+  const text = msg.text;
+
+  if (!text || text.startsWith("/")) return;
+
+  const state = userState[senderId];
+  if (!state) return;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (state.step === "wait_email") {
+    if (!emailRegex.test(text.trim())) {
+      const errorText = `<h3>❌ Format Email Tidak Valid</h3>
+<p>Silakan kirim email dengan format yang benar!</p>
+
+<pre>Contoh: contoh@gmail.com</pre>`;
+      return sendRichMessage(chatId, errorText);
+    }
+
+    const email = text.trim();
+    userState[senderId].email = email;
+    userState[senderId].step = "wait_link";
+
+    bot.sendChatAction(chatId, "typing");
+
+    try {
+      const response = await amprem.sendLink(email);
+
+      if (response?.success) {
+        db.sessions[email] = {
+          email: email,
+          status: "pending",
+          sentAt: new Date().toISOString(),
+          verifiedAt: null,
+          link: null
+        };
+        saveDatabase();
+
+        const successText = `<h2>✅ Email Berhasil Dikirim!</h2>
+
+<p>Email Target: <code>${email}</code></p>
+
+<hr/>
+<h3>📋 Langkah Selanjutnya:</h3>
+<ol>
+  <li>Cek email kamu (cek folder Spam jika ada)</li>
+  <li>Klik tombol 'Log in to Alight Motion'</li>
+  <li>Salin URL setelah di-redirect</li>
+  <li>Kirimkan link URL tersebut di sini</li>
+</ol>`;
+
+        await sendRichMessage(chatId, successText);
+      } else {
+        throw new Error(response?.message || "Gagal mengirim link");
+      }
+    } catch (e) {
+      console.error("Error AM Send:", e);
+      delete userState[senderId];
+
+      const failText = `<h3>❌ Gagal Mengirim Link</h3>
+<p>${e.message}</p>`;
+      await sendRichMessage(chatId, failText);
+    }
+  }
+
+  else if (state.step === "wait_link") {
+    const email = state.email;
+    const link = text.trim();
+
+    if (!link.startsWith("http")) {
+      const invalidLinkText = `<h3>❌ Link Tidak Valid</h3>
+<p>Link harus diawali dengan http:// atau https://</p>`;
+      return sendRichMessage(chatId, invalidLinkText);
+    }
+
+    bot.sendChatAction(chatId, "typing");
+
+    try {
+      const response = await amprem.verifyLink(email, link);
+
+      if (response?.success) {
+        const userEmail = response.user?.email || email;
+        const expiryMs = response.premium?.data?.result?.expiryTimeMillis;
+        const expiryDate = expiryMs
+          ? new Date(Number(expiryMs)).toLocaleDateString('id-ID', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            })
+          : 'Aktif (Permanent)';
+
+        if (db.sessions[email]) {
+          db.sessions[email].verifiedAt = new Date().toISOString();
+          db.sessions[email].status = 'verified';
+          db.sessions[email].link = link;
+          saveDatabase();
+        }
+
+        const verifText = `<h2>🎉 Verifikasi Berhasil!</h2>
+
+<table bordered striped>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Email</td><td><code>${userEmail}</code></td></tr>
+  <tr><td>Status</td><td>Premium ✨</td></tr>
+  <tr><td>Expired</td><td>${expiryDate}</td></tr>
+</table>
+
+<hr/>
+<p>Selamat! Alight Motion Premium berhasil diaktifkan!</p>
+
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+        await sendRichMessage(chatId, verifText);
+        
+        delete userState[senderId];
+      } else {
+        throw new Error(response?.message || "Gagal memverifikasi akun");
+      }
+    } catch (e) {
+      console.error("Error AM Verif:", e);
+
+      let errorMsg = e.message;
+      if (e.message.includes('Email tidak valid')) {
+        errorMsg = "Format email tidak valid!";
+      } else if (e.message.includes('Magic Link')) {
+        errorMsg = "Link tidak valid atau sudah expired!";
+      } else if (e.message.includes('AES')) {
+        errorMsg = "Server error - silakan coba lagi nanti.";
+      }
+
+      const failVerifText = `<h3>❌ Verifikasi Gagal</h3>
+<p>${errorMsg}</p>
+<p>Silakan coba lagi dengan mengirimkan link URL yang benar.</p>`;
+
+      await sendRichMessage(chatId, failVerifText);
+    }
+  }
+});
+
+startBot();
