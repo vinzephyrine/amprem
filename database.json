@@ -125,6 +125,27 @@
       "sentAt": "2026-08-07T14:50:32.955Z",
       "verifiedAt": "2026-08-07T14:52:29.515Z",
       "link": "https://alightcreative.com/auth_action/?apiKey=AIzaSyDrZ9jr_Y16ltSBqsQR5IH6I04FRga6Ki0&mode=signIn&oobCode=4NM5MJ0osemuDOLFqH54dL7TkJkJ5oVN7BIT_DuCbBQAAAGf3LRP1A&continueUrl=https%3A%2F%2Falightcreative.com%3Fui_sid%3D0366624874%26ui_sd%3D0&lang=en"
+    },
+    "yansyahrizki427@gmail.com": {
+      "email": "yansyahrizki427@gmail.com",
+      "status": "verified",
+      "sentAt": "2026-08-07T15:57:21.682Z",
+      "verifiedAt": "2026-08-07T15:58:30.919Z",
+      "link": "https://alight-creative.firebaseapp.com/__/auth/links?link=https://alightcreative.com/auth_action/?apiKey%3DAIzaSyDrZ9jr_Y16ltSBqsQR5IH6I04FRga6Ki0%26mode%3DsignIn%26oobCode%3D3azarGGM9tGM5o5zPWQLtH1whJXCVy87e5ZdrxrZ05MAAAGf3PF6qg%26continueUrl%3Dhttps://alightcreative.com?ui_sid%253D0366624874%2526ui_sd%253D0%26lang%3Den"
+    },
+    "sindifebriani22614@gmail.com": {
+      "email": "sindifebriani22614@gmail.com",
+      "status": "pending",
+      "sentAt": "2026-08-07T17:06:29.880Z",
+      "verifiedAt": null,
+      "link": null
+    },
+    "ikyyxiterz4@gmail.com": {
+      "email": "ikyyxiterz4@gmail.com",
+      "status": "verified",
+      "sentAt": "2026-08-07T17:15:41.217Z",
+      "verifiedAt": "2026-08-07T17:16:23.124Z",
+      "link": "https://alight-creative.firebaseapp.com/__/auth/links?link=https://alightcreative.com/auth_action/?apiKey%3DAIzaSyDrZ9jr_Y16ltSBqsQR5IH6I04FRga6Ki0%26mode%3DsignIn%26oobCode%3DS372TWnuAybAu3rjMyl6isML2363_GQz5iyTkhu40REAAAGf3Tkw1Q%26continueUrl%3Dhttps://alightcreative.com?ui_sid%253D0366624874%2526ui_sd%253D0%26lang%3Den"
     }
   }
 }
