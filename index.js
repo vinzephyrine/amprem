@@ -351,7 +351,7 @@ bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
 
 <table bordered striped>
   <tr><th>Info</th><th>Detail</th></tr>
-  <tr><td>Status</td><td>🔴 Maintenance</td></tr>
+  <tr><td>Status</td><td>🔴 Offline</td></tr>
   <tr><td>Waktu</td><td>${timeNow} WIB</td></tr>
   <tr><td>Aktivasi AM</td><td>Nonaktif Sementara</td></tr>
 </table>
@@ -380,10 +380,10 @@ bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
 </table>
 
 <aside>
-  Bot sudah siap menerima permintaan baru. Silakan gunakan bot untuk mengaktifkan Alight Motion Premium kamu secara gratis!
+  Bot sudah selesai dari Maintenance. Silakan gunakan bot kembali untuk mengaktifkan Alight Motion Premium kamu secara gratis!
 </aside>
 
-<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>*`;
 
     buttons = {
       inline_keyboard: [
@@ -424,7 +424,7 @@ bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
 </table>
 
 <hr/>
-<footer>© Maintenance System - <a href="https://t.me/yat1mlau">yat1mlau</a></footer>`;
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
 
   await sendRichMessage(chatId, reportText);
 });
@@ -670,7 +670,7 @@ bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
 </table>
 
 <hr/>
-<footer>© Auto Backup System - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
 
     await sendRichMessage(chatId, resultText);
   } catch (error) {
