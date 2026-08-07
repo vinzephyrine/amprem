@@ -15,9 +15,11 @@ const IMAGE_URL = "https://g.top4top.io/p_3871xq4od1.jpg";
 
 const DB_PATH = path.join(__dirname, "database.json");
 const USERS_PATH = path.join(__dirname, "users.json");
+const MAINTENANCE_PATH = path.join(__dirname, "maintenance.json");
 
 let db = {};
 let usersList = [];
+let maintenance = { status: "off" };
 const userState = {};
 
 const mainOwnerIds = Array.isArray(global.ownerId)
@@ -74,6 +76,28 @@ function saveUsersDatabase() {
   }
 }
 
+function loadMaintenanceDatabase() {
+  try {
+    if (fs.existsSync(MAINTENANCE_PATH)) {
+      maintenance = JSON.parse(fs.readFileSync(MAINTENANCE_PATH, "utf8"));
+    } else {
+      maintenance = { status: "off" };
+      saveMaintenanceDatabase();
+    }
+  } catch (error) {
+    console.error("Error loading maintenance database:", error);
+    maintenance = { status: "off" };
+  }
+}
+
+function saveMaintenanceDatabase() {
+  try {
+    fs.writeFileSync(MAINTENANCE_PATH, JSON.stringify(maintenance, null, 2));
+  } catch (error) {
+    console.error("Error saving maintenance database:", error);
+  }
+}
+
 function registerUser(userId) {
   if (!usersList.includes(userId)) {
     usersList.push(userId);
@@ -83,6 +107,7 @@ function registerUser(userId) {
 
 loadDatabase();
 loadUsersDatabase();
+loadMaintenanceDatabase();
 
 async function isChannelMember(userId) {
   for (const channel of CHANNELS) {
@@ -127,12 +152,12 @@ function startBot() {
 ⣿⣿⣿⣿⣿⣷⣿⣿⣿⡅⡹⢿⠆⠙⠋⠉⠻⠿⣿⣿⣿⣿⣿⣿⣮⠻⣦⡙⢷⡑⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣌⠡⠌⠂⣙⠻⣛⠻⠷⠐⠈⠛⢱⣮⣷⣽⣿
 ⣿⣿⣿⣿⡇⢿⢹⣿⣶⠐⠁⠀⣀⣠⣤⠄⠀⠀⠈⠙⠻⣿⣿⣿⣦⣵⣌⠻⣷⢝⠦⠚⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢟⣻⣿⣊⡃⠀⣙⠿⣿⣿⣿⣎⢮⡀⢮⣽⣿⣿
 ⢿⣿⣿⣿⣧⡸⡎⡛⡩⠖⠀⣴⣿⣿⣿⠀⠀⠀⠀⠸⠇⠀⠙⢿⣿⣿⣿⣷⣌⢷⣑⢷⣄⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣫⠶⠛⠉⠀⠁⠀⠈⠈⠀⠠⠜⠻⣿⣆⢿⣼⣿⣿⣿
-⢐⣿⣿⣿⣿⣧⢧⣧⢻⣦⢀⣹⣿⣿⣿⣇⠀⠄⠀⠀⠀⡀⠀⠈⢻⣿⣿⣿⣿⣷⣝⢦⡹⠷⡙⢿⣿⣿⣿⣿⣿⣿⣿⣿⠈⠁⠀⠀⠀⠁⠀⠀⠀⠱⣶⣄⡀⠀⠈⠛⠜⣿⣿⣿⣿
+⣿⣿⣿⣿⣧⢧⣧⢻⣦⢀⣹⣿⣿⣿⣇⠀⠄⠀⠀⠀⡀⠀⠈⢻⣿⣿⣿⣿⣷⣝⢦⡹⠷⡙⢿⣿⣿⣿⣿⣿⣿⣿⣿⠈⠁⠀⠀⠀⠁⠀⠀⠀⠱⣶⣄⡀⠀⠈⠛⠜⣿⣿⣿⣿
 ⠀⠊⢫⣿⣏⣿⡌⣼⣄⢫⡌⣿⣿⣿⣿⣿⣦⡈⠲⣄⣤⣤⡡⢀⣠⣿⣿⣿⣿⣿⣿⣷⣼⣍⢬⣦⡙⣿⣿⣿⣿⣿⣯⢁⡄⠀⡀⡀⠀⠄⢈⣠⢪⠀⣿⣿⣿⣦⠀⢉⢂⠹⡿⣿⣿
 ⠀⠀⠄⢹⢃⢻⣟⠙⣿⣦⠱⢻⣿⣿⣿⣿⣿⣿⣷⣬⣍⣭⣥⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⡙⢿⣼⡿⣿⣿⣿⣿⣿⣷⣄⠘⣱⢦⣤⡴⡿⢈⣼⣿⣿⣿⣇⣴⣶⣮⣅⢻⣿⡏
 ⠀⠀⠈⠹⣇⢡⢿⡆⠻⣿⣷⠀⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣍⡻⣿⣟⣻⣿⣿⣿⣿⣷⣦⣥⣬⣤⣴⣾⣿⣿⣿⣿⣷⣿⣿⣿⣿⣷⡜⠃
-⠀⠀⠀⢀⣘⠈⢂⠃⣧⡹⣿⣷⡄⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣮⣅⡙⢿⣟⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠋⡕⠂
-⠀⠀⠀⠀⠀⠀⠛⢷⣜⢷⡌⠻⣿⣿⣦⣝⣻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⣹⣷⣦⣹⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠉⠃⠀
+⠀⠀⠀⢀⣘⠈⢂⠃⣧⡹⣿⣷⡄⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣮⣅⡙⢿⣟⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠋⡕⠂
+⠀⠀⠀⠀⠀⠀⠛⢷⣜⢷⡌⠻⣿⣿⣦⣝⣻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⣹⣷⣦⣹⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠉⠃⠀
 
 ┌──────────────────────────────────────────────────┐
 │ DEVELOPER   : t.me/yat1mlau                      │
@@ -168,6 +193,47 @@ async function sendRichMessage(chatId, htmlContent, replyMarkup = null) {
     console.error("Gagal sendRichMessage:", e.response?.data || e.message);
     await bot.sendMessage(chatId, htmlContent, { parse_mode: "HTML", reply_markup: replyMarkup });
   }
+}
+
+async function checkMaintenance(chatId, senderId) {
+  if (maintenance.status === "on" && !isMainOwner(senderId)) {
+    const timeNow = new Date().toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Asia/Jakarta"
+    });
+
+    const text = `<h2>BOT SEDANG MAINTENANCE</h2>
+
+<table bordered striped>
+  <tr><th>Info</th><th>Detail</th></tr>
+  <tr><td>Status</td><td>🔴 Maintenance</td></tr>
+  <tr><td>Waktu Server</td><td>${timeNow} WIB</td></tr>
+  <tr><td>Aktivasi AM</td><td>Nonaktif Sementara</td></tr>
+</table>
+
+<aside>
+  Bot sedang dalam peningkatan performa & pemeliharaan sistem. Semua fitur aktivasi di-nonaktifkan sementara waktu hingga proses perbaikan selesai.
+</aside>
+
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+    const buttons = {
+      inline_keyboard: [
+        [
+          { text: "Hubungi Admin", url: "https://t.me/yat1mlau", style: "primary" }
+        ]
+      ]
+    };
+
+    await sendRichMessage(chatId, text, buttons);
+    return true;
+  }
+  return false;
 }
 
 function getMainMenuText(msgFrom) {
@@ -245,11 +311,131 @@ function getAllFiles(dirPath, arrayOfFiles = [], ignoreList = []) {
   return arrayOfFiles;
 }
 
+bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const senderId = msg.from.id;
+  const option = match[1] ? match[1].toLowerCase() : null;
+
+  if (!isMainOwner(senderId)) {
+    return sendRichMessage(chatId, "<h3>❌ Akses Ditolak</h3><p>Perintah ini hanya dapat digunakan oleh Owner!</p>");
+  }
+
+  if (!option || !["on", "off"].includes(option)) {
+    const text = `<h3>⚙️ FITUR MAINTENANCE</h3>
+<p>Status saat ini: <b>${maintenance.status.toUpperCase()}</b></p>
+<hr/>
+<p>Gunakan perintah:</p>
+<pre>/maintenance on  - Aktifkan maintenance & Auto-Broadcast</pre>
+<pre>/maintenance off - Matikan maintenance & Auto-Broadcast</pre>`;
+    return sendRichMessage(chatId, text);
+  }
+
+  maintenance.status = option;
+  saveMaintenanceDatabase();
+
+  const timeNow = new Date().toLocaleString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Asia/Jakarta"
+  });
+
+  let broadcastText = "";
+  let buttons = null;
+
+  if (option === "on") {
+    broadcastText = `<h2>BOT SEDANG MAINTENANCE</h2>
+
+<table bordered striped>
+  <tr><th>Info</th><th>Detail</th></tr>
+  <tr><td>Status</td><td>🔴 Maintenance</td></tr>
+  <tr><td>Waktu</td><td>${timeNow} WIB</td></tr>
+  <tr><td>Aktivasi AM</td><td>Nonaktif Sementara</td></tr>
+</table>
+
+<aside>
+  Bot sedang dalam peningkatan performa & pemeliharaan sistem. Fitur aktivasi di-nonaktifkan sementara waktu hingga perbaikan selesai.
+</aside>
+
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+    buttons = {
+      inline_keyboard: [
+        [
+          { text: "Hubungi Admin", url: "https://t.me/yat1mlau", style: "primary" }
+        ]
+      ]
+    };
+  } else {
+    broadcastText = `<h2>BOT SEDANG AKTIF</h2>
+
+<table bordered striped>
+  <tr><th>Info</th><th>Detail</th></tr>
+  <tr><td>Status</td><td>🟢 Online</td></tr>
+  <tr><td>Waktu</td><td>${timeNow} WIB</td></tr>
+  <tr><td>Aktivasi AM</td><td>Normal / Siap Digunakan</td></tr>
+</table>
+
+<aside>
+  Bot sudah siap menerima permintaan baru. Silakan gunakan bot untuk mengaktifkan Alight Motion Premium kamu secara gratis!
+</aside>
+
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+    buttons = {
+      inline_keyboard: [
+        [
+          { text: "Hubungi Admin", url: "https://t.me/yat1mlau", style: "primary" }
+        ]
+      ]
+    };
+  }
+
+  const statusNotice = await bot.sendMessage(
+    chatId, 
+    `⏳ Mode maintenance diubah menjadi *${option.toUpperCase()}*. Memulai Auto-Broadcast ke ${usersList.length} user...`, 
+    { parse_mode: "Markdown" }
+  );
+
+  let successCount = 0;
+  let failedCount = 0;
+
+  for (const targetId of usersList) {
+    try {
+      await sendRichMessage(targetId, broadcastText, buttons);
+      successCount++;
+    } catch (e) {
+      failedCount++;
+    }
+  }
+
+  await deleteMessage(chatId, statusNotice.message_id);
+
+  const reportText = `<h2>✅ Mode Maintenance Berhasil Diubah!</h2>
+
+<table bordered striped>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Status Mode</td><td><b>${option.toUpperCase()}</b></td></tr>
+  <tr><td>Berhasil Dikirimi</td><td>${successCount} User</td></tr>
+  <tr><td>Gagal Dikirimi</td><td>${failedCount} User</td></tr>
+</table>
+
+<hr/>
+<footer>© Maintenance System - <a href="https://t.me/yat1mlau">yat1mlau</a></footer>`;
+
+  await sendRichMessage(chatId, reportText);
+});
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const senderId = msg.from.id;
 
   registerUser(senderId);
+
+  if (await checkMaintenance(chatId, senderId)) return;
 
   const isMember = await isChannelMember(senderId);
 
@@ -280,39 +466,68 @@ bot.onText(/\/start/, async (msg) => {
 bot.onText(/\/(bc|broadcast)(?:\s+([\s\S]+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const senderId = msg.from.id;
-  const broadcastText = match[2];
+  
+  let broadcastText = match[2] ? match[2].trim() : "";
 
   if (!isMainOwner(senderId)) {
     return sendRichMessage(chatId, "<h3>❌ Akses Ditolak</h3><p>Perintah ini hanya dapat digunakan oleh Owner!</p>");
   }
 
+  let mediaFileId = null;
+  let mediaType = null;
+
+  if (msg.reply_to_message) {
+    const replyMsg = msg.reply_to_message;
+
+    if (!broadcastText && replyMsg.caption) {
+      broadcastText = replyMsg.caption;
+    }
+
+    if (replyMsg.photo) {
+      mediaFileId = replyMsg.photo[replyMsg.photo.length - 1].file_id;
+      mediaType = "photo";
+    } else if (replyMsg.video) {
+      mediaFileId = replyMsg.video.file_id;
+      mediaType = "video";
+    }
+  }
+
   if (!broadcastText) {
     const usageText = `<h3>📢 Format Broadcast Salah</h3>
-<p>Gunakan format perintah berikut:</p>
-<pre>/bc &lt;pesan broadcast&gt;</pre>
-<p>Contoh: <code>/bc Hallo semua, ada update bot terbaru!</code></p>`;
+<p>Gunakan perintah:</p>
+<pre>/bc &lt;pesan&gt;</pre>
+<p><i>Atau reply Foto/Video dengan perintah <code>/bc</code></i></p>`;
     return sendRichMessage(chatId, usageText);
   }
 
   if (usersList.length === 0) {
-    return sendRichMessage(chatId, "<h3>📭 Database User Kosong</h3><p>Belum ada user yang terdaftar di database.</p>");
+    return sendRichMessage(chatId, "<h3>📭 Database User Kosong</h3>");
   }
 
-  const statusMsg = await bot.sendMessage(chatId, "⏳ *Mengirim broadcast ke semua user...*", { parse_mode: "Markdown" });
+  const statusMsg = await bot.sendMessage(chatId, "⏳ *Mengirim Broadcast...*", { parse_mode: "Markdown" });
 
   let successCount = 0;
   let failedCount = 0;
 
-  const formattedBcText = `<h2>📢 BROADCAST ANNOUNCEMENT</h2>
-
-<p>${broadcastText.replace(/\n/g, "<br/>")}</p>
-
-<hr/>
-<footer>© Message from Owner - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
-
   for (const targetId of usersList) {
     try {
-      await sendRichMessage(targetId, formattedBcText);
+      if (mediaType === "photo") {
+        await bot.sendPhoto(targetId, mediaFileId, {
+          caption: `📢 <b>BROADCAST ANNOUNCEMENT</b>\n\n${broadcastText}\n\n<i>© Powered by @yat1mlau</i>`,
+          parse_mode: "HTML"
+        });
+      } else if (mediaType === "video") {
+        await bot.sendVideo(targetId, mediaFileId, {
+          caption: `📢 <b>BROADCAST ANNOUNCEMENT</b>\n\n${broadcastText}\n\n<i>© Powered by @yat1mlau</i>`,
+          parse_mode: "HTML"
+        });
+      } else {
+        const richHtml = `<h2>📢 BROADCAST ANNOUNCEMENT</h2>
+<p>${broadcastText.replace(/\n/g, "<br/>")}</p>
+<hr/>
+<footer>© Message from Owner - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+        await sendRichMessage(targetId, richHtml);
+      }
       successCount++;
     } catch (e) {
       failedCount++;
@@ -322,7 +537,6 @@ bot.onText(/\/(bc|broadcast)(?:\s+([\s\S]+))?/, async (msg, match) => {
   await deleteMessage(chatId, statusMsg.message_id);
 
   const reportText = `<h2>✅ Broadcast Selesai!</h2>
-
 <table bordered striped>
   <tr><th>Status</th><th>Jumlah</th></tr>
   <tr><td>Total User</td><td>${usersList.length}</td></tr>
@@ -393,7 +607,8 @@ bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
       "index.js",
       "package.json",
       "database.json",
-      "users.json"
+      "users.json",
+      "maintenance.json"
     ];
 
     const allFiles = getAllFiles(__dirname, [], ["node_modules", ".git", ".npm", ".npm-cache"]);
@@ -470,6 +685,10 @@ bot.on("callback_query", async (query) => {
   const messageId = query.message.message_id;
   const senderId = query.from.id;
   const action = query.data;
+
+  if (await checkMaintenance(chatId, senderId)) {
+    return bot.answerCallbackQuery(query.id, { text: "⚠️ Bot sedang maintenance!", show_alert: true });
+  }
 
   try {
     if (action === "check_follow") {
@@ -558,6 +777,8 @@ bot.on("message", async (msg) => {
   const text = msg.text;
 
   if (!text || text.startsWith("/")) return;
+
+  if (await checkMaintenance(chatId, senderId)) return;
 
   const state = userState[senderId];
   if (!state) return;
