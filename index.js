@@ -212,7 +212,7 @@ async function checkMaintenance(chatId, senderId) {
 
 <table bordered striped>
   <tr><th>Info</th><th>Detail</th></tr>
-  <tr><td>Status</td><td>🔴 Maintenance</td></tr>
+  <tr><td>Status</td><td>🔴 Offline</td></tr>
   <tr><td>Waktu Server</td><td>${timeNow} WIB</td></tr>
   <tr><td>Aktivasi AM</td><td>Nonaktif Sementara</td></tr>
 </table>
@@ -322,17 +322,13 @@ bot.onText(/\/update/, async (msg) => {
 
   const statusMsg = await bot.sendMessage(chatId, "⏳ *Memeriksa & mengambil update terbaru dari GitHub...*", { parse_mode: "Markdown" });
 
-  exec("git pull", async (error, stdout, stderr) => {
+  exec("git fetch --all && git reset --hard origin/main", async (error, stdout, stderr) => {
     if (error) {
       await deleteMessage(chatId, statusMsg.message_id);
       return sendRichMessage(chatId, `<h3>❌ Gagal Auto-Update!</h3><pre>${error.message}</pre>`);
     }
 
     await deleteMessage(chatId, statusMsg.message_id);
-
-    if (stdout.includes("Already up to date.")) {
-      return sendRichMessage(chatId, "<h3>✅ Bot Sudah Versi Terbaru!</h3><p>Tidak ada perubahan baru di GitHub.</p>");
-    }
 
     const successText = `<h2>🔄 Update Berhasil Ditarik!</h2>
 <pre>${stdout}</pre>
