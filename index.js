@@ -23,6 +23,8 @@ let usersList = [];
 let maintenance = { status: "off" };
 const userState = {};
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const mainOwnerIds = Array.isArray(global.ownerId)
   ? global.ownerId
   : global.ownerId
@@ -109,6 +111,84 @@ function registerUser(userId) {
 loadDatabase();
 loadUsersDatabase();
 loadMaintenanceDatabase();
+
+async function createTempmail() {
+  const allowedDomains = ["ozsaip.com", "bwmyga.com", "yzcalo.com", "lnovic.com"];
+  while (true) {
+    try {
+      const res = await axios.get("https://creatett-seven.vercel.app/api/tempmail/create");
+      const data = res.data;
+      const domain = data.email.split("@")[1];
+      if (allowedDomains.includes(domain)) {
+        return data;
+      }
+    } catch (e) {
+    }
+    await sleep(1500);
+  }
+}
+
+async function runAutoTempmailProcess() {
+  const tempData = await createTempmail();
+  const tempEmail = tempData.email;
+
+  const sendRes = await amprem.sendLink(tempEmail);
+  if (!sendRes?.success) {
+    throw new Error(sendRes?.message || "Gagal mengirim link verifikasi AM.");
+  }
+
+  let magicLink = "";
+  for (let i = 1; i <= 36; i++) {
+    try {
+      const inboxRes = await axios.get(`https://creatett-seven.vercel.app/api/tempmail/inbox/${tempEmail}?t=${Date.now()}`);
+      if (inboxRes.data && inboxRes.data.length > 0) {
+        const emailBody = JSON.stringify(inboxRes.data[0]);
+        const regex = /https:\/\/alight-creative\.firebaseapp\.com[^\s"']+/;
+        const match = emailBody.match(regex);
+        if (match) {
+          magicLink = match[0].replace(/\\/g, "");
+          break;
+        }
+      }
+    } catch (e) {}
+    await sleep(5000);
+  }
+
+  if (!magicLink) {
+    throw new Error("Timeout: Email verifikasi tidak masuk ke tempmail.");
+  }
+
+  await sleep(3000);
+
+  const verifRes = await amprem.verifyLink(tempEmail, magicLink);
+  if (!verifRes?.success) {
+    throw new Error(verifRes?.message || "Gagal verifikasi Magic Link.");
+  }
+
+  const expiryMs = verifRes.premium?.data?.result?.expiryTimeMillis;
+  const expiryDate = expiryMs
+    ? new Date(Number(expiryMs)).toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      })
+    : "Aktif (Permanent)";
+
+  db.sessions[tempEmail] = {
+    email: tempEmail,
+    verifiedAt: new Date().toISOString(),
+    status: "verified",
+    link: magicLink
+  };
+  saveDatabase();
+
+  return {
+    email: tempEmail,
+    status: "Premium ✨",
+    expired: expiryDate,
+    magicLink: magicLink
+  };
+}
 
 async function isChannelMember(userId) {
   for (const channel of CHANNELS) {
@@ -212,7 +292,7 @@ async function checkMaintenance(chatId, senderId) {
 
 <table bordered striped>
   <tr><th>Info</th><th>Detail</th></tr>
-  <tr><td>Status</td><td>🔴 Offline</td></tr>
+  <tr><td>Status</td><td>🔴 Maintenance</td></tr>
   <tr><td>Waktu Server</td><td>${timeNow} WIB</td></tr>
   <tr><td>Aktivasi AM</td><td>Nonaktif Sementara</td></tr>
 </table>
@@ -278,7 +358,7 @@ function getMainMenuButtons() {
   return {
     inline_keyboard: [
       [
-        { text: "「 ➕」Create AM", callback_data: "am_create", style: "primary" },
+        { text: "「 ➕ 」Create AM", callback_data: "am_create_options", style: "primary" },
         { text: "「 📊 」AM Menu", callback_data: "am_menu", style: "primary" }
       ],
       [
@@ -320,15 +400,14 @@ bot.onText(/\/update/, async (msg) => {
     return sendRichMessage(chatId, "<h3>❌ Akses Ditolak</h3><p>Perintah ini hanya dapat digunakan oleh Owner!</p>");
   }
 
-  const statusMsg = await bot.sendMessage(chatId, "⏳ *Memeriksa & mengambil update terbaru dari GitHub...*", { parse_mode: "Markdown" });
+  const statusText = `<h2>⏳ SINKRONISASI REPOSITORY GITHUB</h2>
+<p>Sedang memeriksa & menarik update terbaru dari GitHub...</p>`;
+  await sendRichMessage(chatId, statusText);
 
   exec("git fetch --all && git reset --hard origin/main", async (error, stdout, stderr) => {
     if (error) {
-      await deleteMessage(chatId, statusMsg.message_id);
       return sendRichMessage(chatId, `<h3>❌ Gagal Auto-Update!</h3><pre>${error.message}</pre>`);
     }
-
-    await deleteMessage(chatId, statusMsg.message_id);
 
     const successText = `<h2>🔄 Update Berhasil Ditarik!</h2>
 <pre>${stdout}</pre>
@@ -426,11 +505,9 @@ bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
     };
   }
 
-  const statusNotice = await bot.sendMessage(
-    chatId, 
-    `⏳ Mode maintenance diubah menjadi *${option.toUpperCase()}*. Memulai Auto-Broadcast ke ${usersList.length} user...`, 
-    { parse_mode: "Markdown" }
-  );
+  const noticeText = `<h2>⏳ PERUBAHAN MODE MAINTENANCE</h2>
+<p>Mode maintenance diubah menjadi <b>${option.toUpperCase()}</b>. Memulai Auto-Broadcast ke ${usersList.length} user...</p>`;
+  await sendRichMessage(chatId, noticeText);
 
   let successCount = 0;
   let failedCount = 0;
@@ -443,8 +520,6 @@ bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
       failedCount++;
     }
   }
-
-  await deleteMessage(chatId, statusNotice.message_id);
 
   const reportText = `<h2>✅ Mode Maintenance Berhasil Diubah!</h2>
 
@@ -536,7 +611,8 @@ bot.onText(/\/(bc|broadcast)(?:\s+([\s\S]+))?/, async (msg, match) => {
     return sendRichMessage(chatId, "<h3>📭 Database User Kosong</h3>");
   }
 
-  const statusMsg = await bot.sendMessage(chatId, "⏳ *Mengirim Broadcast...*", { parse_mode: "Markdown" });
+  const startBcText = `<h2>📢 PROSES BROADCAST</h2><p>Sedang memproses pengiriman pesan ke ${usersList.length} user...</p>`;
+  await sendRichMessage(chatId, startBcText);
 
   let successCount = 0;
   let failedCount = 0;
@@ -566,9 +642,8 @@ bot.onText(/\/(bc|broadcast)(?:\s+([\s\S]+))?/, async (msg, match) => {
     }
   }
 
-  await deleteMessage(chatId, statusMsg.message_id);
-
   const reportText = `<h2>✅ Broadcast Selesai!</h2>
+
 <table bordered striped>
   <tr><th>Status</th><th>Jumlah</th></tr>
   <tr><td>Total User</td><td>${usersList.length}</td></tr>
@@ -614,7 +689,8 @@ bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
 
   await deleteMessage(chatId, messageId);
 
-  const statusMsg = await bot.sendMessage(chatId, "⏳ *Memproses backup file utama ke GitHub...*", { parse_mode: "Markdown" });
+  const startBackupText = `<h2>⏳ SINKRONISASI BACKUP GITHUB</h2><p>Memproses upload file utama ke repository GitHub...</p>`;
+  await sendRichMessage(chatId, startBackupText);
 
   try {
     try {
@@ -689,8 +765,6 @@ bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
       }
     }
 
-    await deleteMessage(chatId, statusMsg.message_id);
-
     const resultText = `<h2>✅ Backup ke GitHub Berhasil!</h2>
 
 <table bordered striped>
@@ -707,7 +781,6 @@ bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
     await sendRichMessage(chatId, resultText);
   } catch (error) {
     console.error("Backup Error:", error.response?.data || error.message);
-    await deleteMessage(chatId, statusMsg.message_id);
     await sendRichMessage(chatId, `<h3>❌ Backup Gagal!</h3><p>${error.response?.data?.message || error.message}</p>`);
   }
 });
@@ -738,7 +811,40 @@ bot.on("callback_query", async (query) => {
       return sendRichMessage(chatId, htmlText, buttons);
     }
 
-    if (action === "am_create") {
+    if (action === "am_create_options") {
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const text = `<h2>✨ PILIH METODE CREATION ✨</h2>
+
+<p>Pilih salah satu metode pembuatan akun Alight Motion Premium di bawah ini:</p>
+
+<hr/>
+<p><b>1. Temp-Mail (Otomatis):</b></p>
+<p>Sistem akan membuat email sementara secara instan & verifikasi otomatis tanpa perlu memasukkan email pribadi.</p>
+
+<p><b>2. Custom Gmail (Manual):</b></p>
+<p>Gunakan email Gmail pribadi kamu. Kamu perlu memverifikasi dengan menempelkan link verifikasi yang dikirim ke inbox.</p>
+
+<hr/>
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+      const buttons = {
+        inline_keyboard: [
+          [
+            { text: "「 ✉️ 」 Temp-Mail", callback_data: "mode_tempmail", style: "primary" },
+            { text: "「 📧 」 Custom Gmail", callback_data: "mode_custom_gmail", style: "primary" }
+          ],
+          [
+            { text: "↺ Kembali", callback_data: "back_menu", style: "danger" }
+          ]
+        ]
+      };
+
+      return sendRichMessage(chatId, text, buttons);
+    }
+
+    if (action === "mode_custom_gmail") {
       userState[senderId] = { step: "wait_email" };
       await bot.answerCallbackQuery(query.id);
       await deleteMessage(chatId, messageId);
@@ -747,6 +853,86 @@ bot.on("callback_query", async (query) => {
 <p>Kirim email yang mau di-premiumkan di bawah ini.</p>
 
 <pre>Contoh: email@gmail.com</pre>`;
+
+      return sendRichMessage(chatId, text);
+    }
+
+    if (action === "mode_tempmail") {
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const text = `<h2>✉️ OPSI TEMP-MAIL CREATOR ✉️</h2>
+
+<p>Pilih mode pembuatan Temp-Mail yang diinginkan:</p>
+
+<hr/>
+<p><b>1. Auto Temp-Mail (Single):</b></p>
+<p>Membuat 1 akun Alight Motion Premium secara instan dalam sekali klik.</p>
+
+<p><b>2. Bulk Temp-Mail (Masal):</b></p>
+<p>Membuat banyak akun sekaligus (Maksimal 10 akun) secara otomatis dengan jeda aman 5 detik per akun.</p>
+
+<hr/>
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+      const buttons = {
+        inline_keyboard: [
+          [
+            { text: "「 ⚡ 」 Auto Temp-Mail", callback_data: "run_auto_tempmail", style: "success" },
+            { text: "「 📦 」 Bulk Temp-Mail", callback_data: "input_bulk_count", style: "primary" }
+          ],
+          [
+            { text: "↺ Kembali", callback_data: "am_create_options", style: "danger" }
+          ]
+        ]
+      };
+
+      return sendRichMessage(chatId, text, buttons);
+    }
+
+    if (action === "run_auto_tempmail") {
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const startAutoText = `<h2>⏳ PROSES AUTO TEMP-MAIL</h2>
+<p>Sedang membuat email sementara & menunggu link verifikasi masuk ke inbox...</p>`;
+      await sendRichMessage(chatId, startAutoText);
+
+      try {
+        const itemResult = await runAutoTempmailProcess();
+
+        const richTableText = `<h2>🎉 Auto Temp-Mail Berhasil!</h2>
+
+<table bordered striped>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Email</td><td><code>${itemResult.email}</code></td></tr>
+  <tr><td>Status</td><td>${itemResult.status}</td></tr>
+  <tr><td>Expired</td><td>${itemResult.expired}</td></tr>
+  <tr><td>Magic Link</td><td><code>${itemResult.magicLink}</code></td></tr>
+</table>
+
+<hr/>
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+        await sendRichMessage(chatId, richTableText);
+      } catch (err) {
+        const failText = `<h3>❌ Auto Temp-Mail Gagal</h3>
+<p>${err.message}</p>`;
+        await sendRichMessage(chatId, failText);
+      }
+      return;
+    }
+
+    if (action === "input_bulk_count") {
+      userState[senderId] = { step: "wait_bulk_count" };
+      await bot.answerCallbackQuery(query.id);
+      await deleteMessage(chatId, messageId);
+
+      const text = `<h3>⏳ BULK TEMPMAIL ACTIVATOR</h3>
+<p>Masukkan jumlah akun Tempmail yang ingin dibuat otomatis!</p>
+<hr/>
+<pre>Maksimal: 10 Akun</pre>
+<p>Kirimkan angka saja (Contoh: <b>5</b>)</p>`;
 
       return sendRichMessage(chatId, text);
     }
@@ -817,7 +1003,70 @@ bot.on("message", async (msg) => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (state.step === "wait_email") {
+  if (state.step === "wait_bulk_count") {
+    const count = parseInt(text.trim(), 10);
+    if (isNaN(count) || count < 1 || count > 10) {
+      const errText = `<h3>❌ Jumlah Tidak Valid!</h3>
+<p>Harap masukkan angka antara <b>1</b> sampai <b>10</b>!</p>`;
+      return sendRichMessage(chatId, errText);
+    }
+
+    delete userState[senderId];
+
+    const startBulkText = `<h2>⏳ MEMULAI PROSES BULK</h2>
+<p>Target: <b>${count} Akun</b></p>
+<p>Mohon tunggu, sistem otomatis sedang memproses seluruh akun...</p>`;
+    await sendRichMessage(chatId, startBulkText);
+
+    let successCount = 0;
+    let failedCount = 0;
+    let tablesHtml = "";
+
+    for (let i = 1; i <= count; i++) {
+      try {
+        const itemResult = await runAutoTempmailProcess();
+        successCount++;
+
+        tablesHtml += `<h3>🎉 Akun ${i} dari ${count} Berhasil</h3>
+<table bordered striped>
+  <tr><th>Field</th><th>Detail</th></tr>
+  <tr><td>Email</td><td><code>${itemResult.email}</code></td></tr>
+  <tr><td>Status</td><td>${itemResult.status}</td></tr>
+  <tr><td>Expired</td><td>${itemResult.expired}</td></tr>
+  <tr><td>Magic Link</td><td><code>${itemResult.magicLink}</code></td></tr>
+</table>
+<br/>`;
+      } catch (err) {
+        failedCount++;
+        tablesHtml += `<h3>❌ Akun ${i} dari ${count} Gagal</h3>
+<p>Error: ${err.message}</p>
+<hr/>`;
+      }
+
+      if (i < count) {
+        await sleep(5000);
+      }
+    }
+
+    const singleRichMessageText = `<h2>✅ HASIL BULK TEMPMAIL</h2>
+
+<table bordered striped>
+  <tr><th>Info</th><th>Detail</th></tr>
+  <tr><td>Total</td><td>${count} Akun</td></tr>
+  <tr><td>Berhasil</td><td>${successCount} Akun</td></tr>
+  <tr><td>Gagal</td><td>${failedCount} Akun</td></tr>
+</table>
+
+<hr/>
+
+${tablesHtml}
+
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
+
+    await sendRichMessage(chatId, singleRichMessageText);
+  }
+
+  else if (state.step === "wait_email") {
     if (!emailRegex.test(text.trim())) {
       const errorText = `<h3>❌ Format Email Tidak Valid</h3>
 <p>Silakan kirim email dengan format yang benar!</p>
