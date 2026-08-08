@@ -146,6 +146,13 @@
       "sentAt": "2026-08-07T17:15:41.217Z",
       "verifiedAt": "2026-08-07T17:16:23.124Z",
       "link": "https://alight-creative.firebaseapp.com/__/auth/links?link=https://alightcreative.com/auth_action/?apiKey%3DAIzaSyDrZ9jr_Y16ltSBqsQR5IH6I04FRga6Ki0%26mode%3DsignIn%26oobCode%3DS372TWnuAybAu3rjMyl6isML2363_GQz5iyTkhu40REAAAGf3Tkw1Q%26continueUrl%3Dhttps://alightcreative.com?ui_sid%253D0366624874%2526ui_sd%253D0%26lang%3Den"
+    },
+    "kenzjht5@gmail.com": {
+      "email": "kenzjht5@gmail.com",
+      "status": "pending",
+      "sentAt": "2026-08-08T01:48:34.185Z",
+      "verifiedAt": null,
+      "link": null
     }
   }
 }
