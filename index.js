@@ -204,6 +204,51 @@ async function isChannelMember(userId) {
   return true;
 }
 
+function renderSessionPage(page = 1) {
+  const sessions = Object.values(db.sessions);
+  const itemsPerPage = 25;
+  const totalItems = sessions.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+  if (page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+
+  const startIndex = (page - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const pageSessions = sessions.slice(startIndex, endIndex);
+
+  let rowsHtml = "";
+  pageSessions.forEach((s, i) => {
+    rowsHtml += `<tr><td>${startIndex + i + 1}</td><td>${s.email}</td><td>${s.verifiedAt ? "Verified" : "Pending"}</td></tr>`;
+  });
+
+  const text = `<h2>📋 DAFTAR SESSION ALIGHT</h2>
+
+<table bordered striped>
+  <tr><th>No</th><th>Email</th><th>Status</th></tr>
+  ${rowsHtml}
+</table>
+
+<p>Halaman ${page} dari ${totalPages} | Total Session: ${totalItems}</p>`;
+
+  const navButtons = [];
+  if (page > 1) {
+    navButtons.push({ text: "⬅️", callback_data: `am_menu_page_${page - 1}`, style: "primary" });
+  }
+  navButtons.push({ text: `Hal ${page}/${totalPages}`, callback_data: "ignore_page", style: "primary" });
+  if (page < totalPages) {
+    navButtons.push({ text: "➡️", callback_data: `am_menu_page_${page + 1}`, style: "primary" });
+  }
+
+  const inline_keyboard = [];
+  if (navButtons.length > 0) {
+    inline_keyboard.push(navButtons);
+  }
+  inline_keyboard.push([{ text: "↺ Kembali", callback_data: "back_menu", style: "danger" }]);
+
+  return { text, replyMarkup: { inline_keyboard } };
+}
+
 function startBot() {
   const steps = 20;
   let progress = 0;
@@ -359,7 +404,7 @@ function getMainMenuButtons() {
     inline_keyboard: [
       [
         { text: "「 ➕ 」Create AM", callback_data: "am_create_options", style: "primary" },
-        { text: "「 📊 」AM Menu", callback_data: "am_menu", style: "primary" }
+        { text: "「 📊 」AM Menu", callback_data: "am_menu_page_1", style: "primary" }
       ],
       [
         { text: "「 📢 」Channel", url: "https://t.me/aboutvin7x", style: "danger" }
@@ -796,6 +841,10 @@ bot.on("callback_query", async (query) => {
   }
 
   try {
+    if (action === "ignore_page") {
+      return bot.answerCallbackQuery(query.id);
+    }
+
     if (action === "check_follow") {
       const isMember = await isChannelMember(senderId);
       if (!isMember) {
@@ -937,7 +986,7 @@ bot.on("callback_query", async (query) => {
       return sendRichMessage(chatId, text);
     }
 
-    if (action === "am_menu") {
+    if (action.startsWith("am_menu_page_")) {
       if (!isMainOwner(senderId)) {
         return bot.answerCallbackQuery(query.id, { text: "❌ Hanya Owner!", show_alert: true });
       }
@@ -955,23 +1004,10 @@ bot.on("callback_query", async (query) => {
         });
       }
 
-      let rowsHtml = "";
-      sessions.forEach((s, i) => {
-        rowsHtml += `<tr><td>${i + 1}</td><td>${s.email}</td><td>${s.verifiedAt ? "Verified" : "Pending"}</td></tr>`;
-      });
+      const targetPage = parseInt(action.replace("am_menu_page_", ""), 10) || 1;
+      const { text, replyMarkup } = renderSessionPage(targetPage);
 
-      const text = `<h2>📋 DAFTAR SESSION ALIGHT</h2>
-
-<table bordered striped>
-  <tr><th>No</th><th>Email</th><th>Status</th></tr>
-  ${rowsHtml}
-</table>
-
-<p>Total Session: ${sessions.length}</p>`;
-
-      return sendRichMessage(chatId, text, {
-        inline_keyboard: [[{ text: "↺ Kembali", callback_data: "back_menu", style: "danger" }]]
-      });
+      return sendRichMessage(chatId, text, replyMarkup);
     }
 
     if (action === "back_menu") {
