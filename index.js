@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { exec } = require("child_process");
 const TelegramBotApi = require("node-telegram-bot-api");
 const TelegramBot = TelegramBotApi.default || TelegramBotApi;
 
@@ -311,6 +312,41 @@ function getAllFiles(dirPath, arrayOfFiles = [], ignoreList = []) {
   return arrayOfFiles;
 }
 
+bot.onText(/\/update/, async (msg) => {
+  const chatId = msg.chat.id;
+  const senderId = msg.from.id;
+
+  if (!isMainOwner(senderId)) {
+    return sendRichMessage(chatId, "<h3>❌ Akses Ditolak</h3><p>Perintah ini hanya dapat digunakan oleh Owner!</p>");
+  }
+
+  const statusMsg = await bot.sendMessage(chatId, "⏳ *Memeriksa & mengambil update terbaru dari GitHub...*", { parse_mode: "Markdown" });
+
+  exec("git pull", async (error, stdout, stderr) => {
+    if (error) {
+      await deleteMessage(chatId, statusMsg.message_id);
+      return sendRichMessage(chatId, `<h3>❌ Gagal Auto-Update!</h3><pre>${error.message}</pre>`);
+    }
+
+    await deleteMessage(chatId, statusMsg.message_id);
+
+    if (stdout.includes("Already up to date.")) {
+      return sendRichMessage(chatId, "<h3>✅ Bot Sudah Versi Terbaru!</h3><p>Tidak ada perubahan baru di GitHub.</p>");
+    }
+
+    const successText = `<h2>🔄 Update Berhasil Ditarik!</h2>
+<pre>${stdout}</pre>
+<hr/>
+<p>Bot akan otomatis merestart dalam 3 detik...</p>`;
+
+    await sendRichMessage(chatId, successText);
+
+    setTimeout(() => {
+      exec("pm2 restart amprem");
+    }, 3000);
+  });
+});
+
 bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const senderId = msg.from.id;
@@ -383,7 +419,7 @@ bot.onText(/\/maintenance(?:\s+(on|off))?/, async (msg, match) => {
   Bot sudah selesai dari Maintenance. Silakan gunakan bot kembali untuk mengaktifkan Alight Motion Premium kamu secara gratis!
 </aside>
 
-<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>*`;
+<footer>© Since 2026 - <a href="https://t.me/yat1mlau">t.me/yat1mlau</a></footer>`;
 
     buttons = {
       inline_keyboard: [
@@ -564,7 +600,7 @@ bot.onText(/\/backup(?:\s+([\s\S]+))?/, async (msg, match) => {
     const usageText = `<h3>📌 Format Backup Salah</h3>
 <p>Gunakan format perintah berikut:</p>
 <pre>/backup token_github|username_github|nama_repo</pre>
-<p>Contoh: <code>/backup ghp_xxxxxx|vinzephyrine|amprem-bot</code></p>`;
+<p>Contoh: <code>/backup ghp_xxxxxx|vinzephyrine|amprem</code></p>`;
     return sendRichMessage(chatId, usageText);
   }
 
